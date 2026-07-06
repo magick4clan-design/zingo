@@ -90,111 +90,216 @@ app.get('/', (_req, res) => {
   });
 });
 
-// ==================== Full Scrape + Save JSON ====================
-app.get('/scraper/full', async (_req, res) => {
-  if (scraperRunning) {
-    return res.json({ success: false, message: 'اسکرپر در حال اجراست' });
-  }
+// ==================== Fast Scrape with Status ====================
+let scrapeProgress = { phase: 'idle', total: 0, done: 0, current: '', errors: 0 };
+
+app.get('/scrape/start', async (_req, res) => {
+  if (scraperRunning) return res.json({ ok: false, msg: 'در حال اجراست' });
   scraperRunning = true;
-  res.json({ success: true, message: 'اسکرپر شروع شد. از /scraper/full/status وضعیت رو چک کن.' });
-  
-  // Run inline
+  scrapeProgress = { phase: 'شروع', total: 0, done: 0, current: '', errors: 0 };
+  res.json({ ok: true, msg: 'اسکرپر شروع شد' });
+
   (async () => {
     try {
-      const { AnimexScraper } = await import('./scrapers/animexScraper');
-      const { DonyayeSerialScraper } = await import('./scrapers/donyayeSerialScraper');
-      const { BaseScraper } = await import('./scrapers/baseScraper');
-      const fs = require('fs');
-      
-      await BaseScraper.checkStorage();
-      const allData: any[] = [];
-      
-      // Scraping function
+      const axios = (await import('axios')).default;
+      const cheerio = (await import('cheerio')).default;
       const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+      const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
+      const allUrls: string[] = [];
+
+      // === Phase 1: Collect URLs ===
+      scrapeProgress.phase = 'جمع‌آوری لینک‌ها';
       
-      // ANIMEX
-      console.log('Scraping ANIMEX...');
-      const animex = new AnimexScraper();
-      for (const pageType of ['movie', 'serial', 'anime']) {
-        let page = 1;
-        let empty = 0;
-        while (page <= 50 && empty < 2) {
+      for (const [type, baseUrl] of [
+        ['movie', 'https://animex.click/movie/'],
+        ['serial', 'https://animex.click/serial/'],
+        ['anime', 'https://animex.click/anime/'],
+      ] as [string, string][]) {
+        for (let page = 1; page <= 50; page++) {
+          const url = page === 1 ? baseUrl : `${baseUrl}page/${page}/`;
           try {
-            const urls = await animex.getListings(page);
-            if (urls.length === 0) { empty++; page++; continue; }
-            empty = 0;
-            for (const url of urls.slice(0, 100)) {
-              try {
-                const item = await animex.scrapeContent(url);
-                if (item?.title) {
-                  allData.push({ source: 'animex', type: item.type, title: item.title, url, poster: item.posterUrl, description: item.description, year: item.releaseYear, imdb: item.imdbRating, genres: item.genreNames, country: item.country, downloadLinks: item.downloadLinks, screenshots: item.screenshots });
-                }
-                await sleep(500);
-              } catch {}
+            const r = await axios.get(url, { timeout: 10000, headers: { 'User-Agent': UA } });
+            const $ = cheerio.load(r.data);
+            const links: string[] = [];
+          $('a[href]').each(function(this: any, _: any, el: any) {
+            const href = $(el).attr('href') || '';
+            if (href.match(/animex\.(click|cc)\/(anime|movie|serial)\//)) {
+              links.push(href.replace('animex.cc', 'animex.click'));
             }
-            page++;
-            await sleep(1000);
-          } catch { empty++; page++; }
+          });
+            const unique = [...new Set(links)];
+            if (unique.length === 0) break;
+            allUrls.push(...unique);
+            scrapeProgress.current = `${type} صفحه ${page}: ${unique.length} لینک`;
+            await sleep(300);
+          } catch { break; }
         }
       }
-      console.log(`Animex: ${allData.length} items`);
-      
-      // DONYAYESERIAL
-      console.log('Scraping DONYAYESERIAL...');
-      const donyaye = new DonyayeSerialScraper();
-      for (let page = 1; page <= 20; page++) {
+
+      // DonYayeSerial
+      for (let page = 1; page <= 30; page++) {
         try {
-          const urls = await donyaye.getListings(page);
-          if (urls.length === 0) break;
-          for (const url of urls.slice(0, 100)) {
-            try {
-              const item = await donyaye.scrapeContent(url);
-              if (item?.title) {
-                allData.push({ source: 'donyayeserial', type: item.type, title: item.title, url, poster: item.posterUrl, description: item.description, year: item.releaseYear, imdb: item.imdbRating, genres: item.genreNames, downloadLinks: item.downloadLinks, screenshots: item.screenshots });
-              }
-              await sleep(500);
-            } catch {}
-          }
-          await sleep(1000);
+          const r = await axios.get(`https://donyayeserial.com/page/${page}/`, { timeout: 10000, headers: { 'User-Agent': UA } });
+          const $ = cheerio.load(r.data);
+          const links: string[] = [];
+          $('a[href]').each(function(this: any, _: any, el: any) {
+            const href = $(el).attr('href') || '';
+            if (href.match(/donyayeserial\.com\/(series|movie|film)\//)) {
+              links.push(href.startsWith('http') ? href : `https://donyayeserial.com${href}`);
+            }
+          });
+          const unique = [...new Set(links)];
+          if (unique.length === 0) break;
+          allUrls.push(...unique);
+          scrapeProgress.current = `donyayeserial صفحه ${page}: ${unique.length} لینک`;
+          await sleep(300);
         } catch { break; }
       }
-      console.log(`Total: ${allData.length} items`);
-      
-      fs.writeFileSync(path.join(process.cwd(), 'scraped_data.json'), JSON.stringify(allData, null, 2));
-      console.log('File saved!');
-    } catch (err) {
-      console.error('Full scrape error:', err);
+
+      const uniqueUrls = [...new Set(allUrls)];
+      scrapeProgress.total = uniqueUrls.length;
+      scrapeProgress.phase = 'اسکرپ محتوا';
+
+      // === Phase 2: Scrape content ===
+      for (const url of uniqueUrls) {
+        try {
+          scrapeProgress.current = url.substring(url.lastIndexOf('/') + 1, url.lastIndexOf('/') + 40) || url.substring(0, 40);
+          
+          let $: any;
+          if (url.includes('animex')) {
+            const r = await axios.get(url, { timeout: 10000, headers: { 'User-Agent': UA } });
+            $ = cheerio.load(r.data);
+          } else {
+            const r = await axios.get(url, { timeout: 10000, headers: { 'User-Agent': UA } });
+            $ = cheerio.load(r.data);
+          }
+
+          // Extract title
+          let title = '';
+          for (const sel of ['h1.entry-title', 'h1.title', 'h1']) {
+            title = $(sel).text().trim();
+            if (title) break;
+          }
+          if (!title) { const m = $('title').text(); title = m.replace(/–.*$/i, '').trim(); }
+          title = title.replace(/^دانلود\s+(سریال|فیلم|انیمه)\s+/i, '').trim();
+          if (!title) { scrapeProgress.errors++; scrapeProgress.done++; continue; }
+
+          // Type
+          const type = (url.includes('/series/') || url.includes('/serial/')) ? 'series' : 'movie';
+
+          // Poster
+          const poster = $('meta[property="og:image"]').attr('content') || $('img').first().attr('src') || '';
+
+          // Description
+          const description = ($('meta[name="description"]').attr('content') || '').substring(0, 2000);
+
+          // Year
+          const yearMatch = $('body').html()?.match(/\(?(\d{4})\)?/);
+          const year = yearMatch ? parseInt(yearMatch[1]) : null;
+
+          // IMDB
+          const imdbMatch = $('body').text().match(/IMDB[:\s]*(\d+\.?\d*)/i);
+          const imdb = imdbMatch ? parseFloat(imdbMatch[1]) : null;
+
+          // Genres
+          const genres: string[] = [];
+          $('a[href*="/genre/"], a[href*="/tag/"]').each(function(this: any, _: any, el: any) {
+            const g = $(el).text().trim();
+            if (g && g.length > 1 && g.length < 30) genres.push(g);
+          });
+
+          // Download links
+          const dlLinks: Record<string, string> = {};
+          if (url.includes('animex')) {
+            const dlHosts = ['csdl1', 'ndl1', 'ndl2', 'ndl3', 'ndl4', 'ndl5', 'ndl6', 'ndl7', 'dl.hollowofthealley', 'dl2.hollowofthealley'];
+            const hostSelector = dlHosts.map((h: string) => `a[href*="${h}"]`).join(', ');
+            $(hostSelector).each(function(this: any, _: any, el: any) {
+              const href = $(el).attr('href');
+              if (!href || href.includes('subsource') || href.includes('animexstream')) return;
+              const q = extractQ(href);
+              if (!dlLinks[q]) dlLinks[q] = href;
+            });
+          } else {
+            $('a[href]').each(function(this: any, _: any, el: any) {
+              const href = $(el).attr('href');
+              if (href && (href.includes('iran-gamecenter') || href.includes('.mkv') || href.includes('.mp4') || href.includes('download'))) {
+                if (!href.includes('donyayeserial.com')) {
+                  const q = extractQ(href);
+                  if (!dlLinks[q]) dlLinks[q] = href;
+                }
+              }
+            });
+          }
+
+          // Save to DB
+          const slug = slugify(title);
+          const dlJson = JSON.stringify(dlLinks);
+
+          if (type === 'series') {
+            const existing = await prisma.series.findUnique({ where: { slug } });
+            if (!existing) {
+              await prisma.series.create({
+                data: {
+                  title, slug, posterUrl: poster || 'https://via.placeholder.com/300x450',
+                  description, releaseYear: year, imdbRating: imdb,
+                  source: url.includes('animex') ? 'animex' : 'donyayeserial',
+                  sourceUrl: url, cast: '[]', screenshots: '[]',
+                }
+              });
+            }
+          } else {
+            const existing = await prisma.movie.findUnique({ where: { slug } });
+            if (!existing) {
+              await prisma.movie.create({
+                data: {
+                  title, slug, posterUrl: poster || 'https://via.placeholder.com/300x450',
+                  description, releaseYear: year, imdbRating: imdb,
+                  downloadLinks: dlJson, country: 'کشور',
+                  source: url.includes('animex') ? 'animex' : 'donyayeserial',
+                  sourceUrl: url, cast: '[]', screenshots: '[]',
+                }
+              });
+            }
+          }
+
+          scrapeProgress.done++;
+          await sleep(150);
+        } catch {
+          scrapeProgress.errors++;
+          scrapeProgress.done++;
+        }
+      }
+
+      scrapeProgress.phase = 'تمام شد';
+    } catch (err: any) {
+      console.error('Scraper error:', err.message);
     }
     scraperRunning = false;
   })();
 });
 
-app.get('/scraper/full/status', async (_req, res) => {
-  const fs = require('fs');
-  const filePath = path.join(process.cwd(), 'scraped_data.json');
-  
-  if (!fs.existsSync(filePath)) {
-    return res.json({ running: scraperRunning, exists: false });
-  }
-  
-  const stats = fs.statSync(filePath);
-  const ageMinutes = (Date.now() - stats.mtimeMs) / 60000;
-  const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-  
-  res.json({
-    running: scraperRunning,
-    exists: true,
-    lastModified: stats.mtime,
-    ageMinutes: Math.round(ageMinutes),
-    stats: {
-      total: data.length,
-      movies: data.filter((d: any) => d.type === 'movie').length,
-      series: data.filter((d: any) => d.type === 'series').length,
-      animex: data.filter((d: any) => d.source === 'animex').length,
-      donyayeserial: data.filter((d: any) => d.source === 'donyayeserial').length,
-    }
-  });
+app.get('/scrape/status', (_req, res) => {
+  res.json(scrapeProgress);
 });
+
+// Helper functions
+function slugify(text: string): string {
+  const persian: Record<string, string> = {'آ':'a','ا':'a','ب':'b','پ':'p','ت':'t','ث':'s','ج':'j','چ':'ch','ح':'h','خ':'kh','د':'d','ذ':'z','ر':'r','ز':'z','ژ':'zh','س':'s','ش':'sh','ص':'s','ض':'z','ط':'t','ظ':'z','ع':'a','غ':'gh','ف':'f','ق':'gh','ک':'k','گ':'g','ل':'l','م':'m','ن':'n','و':'v','ه':'h','ی':'y'};
+  return text.toLowerCase().trim()
+    .replace(/[\u0600-\u06FF]+/g, c => persian[c] || c)
+    .replace(/[\s\W-]+/g, '-').replace(/^-+|-+$/g, '') || 'untitled';
+}
+
+function extractQ(url: string): string {
+  const decoded = decodeURIComponent(url);
+  const m = decoded.match(/\/(\d{3,4}[p]?)\s*(?:x265|x264)?\s*\/?$/i) || decoded.match(/\[(\d{3,4}[p]?)\]/i);
+  if (m) return m[1].toLowerCase();
+  if (decoded.includes('1080')) return '1080p';
+  if (decoded.includes('720')) return '720p';
+  if (decoded.includes('480')) return '480p';
+  return 'unknown';
+}
 
 // ==================== Debug Scraper ====================
 app.get('/scraper/debug', async (_req, res) => {
