@@ -119,12 +119,12 @@ app.get('/scrape/start', async (_req, res) => {
         for (let page = 1; page <= 50; page++) {
           const url = page === 1 ? baseUrl : `${baseUrl}page/${page}/`;
           try {
-            const r = await axios.get(url, { timeout: 10000, headers: { 'User-Agent': UA } });
+            const r = await axios.get(url, { timeout: 15000, headers: { 'User-Agent': UA }, maxRedirects: 5 });
             const $ = cheerio.load(r.data);
             const links: string[] = [];
-          $('a[href]').each(function(this: any, _: any, el: any) {
-            const href = $(el).attr('href') || '';
-            if (href.match(/animex\.(click|cc)\/(anime|movie|serial)\//)) {
+            $('a[href]').each(function(this: any, _: any, el: any) {
+              const href = $(el).attr('href') || '';
+              if (href.match(/animex\.(click|cc)\/(anime|movie|serial)\//)) {
               links.push(href.replace('animex.cc', 'animex.click'));
             }
           });
@@ -140,7 +140,7 @@ app.get('/scrape/start', async (_req, res) => {
       // DonYayeSerial
       for (let page = 1; page <= 30; page++) {
         try {
-          const r = await axios.get(`https://donyayeserial.com/page/${page}/`, { timeout: 10000, headers: { 'User-Agent': UA } });
+          const r = await axios.get(`https://donyayeserial.com/page/${page}/`, { timeout: 15000, headers: { 'User-Agent': UA }, maxRedirects: 5 });
           const $ = cheerio.load(r.data);
           const links: string[] = [];
           $('a[href]').each(function(this: any, _: any, el: any) {
@@ -168,10 +168,10 @@ app.get('/scrape/start', async (_req, res) => {
           
           let $: any;
           if (url.includes('animex')) {
-            const r = await axios.get(url, { timeout: 10000, headers: { 'User-Agent': UA } });
+            const r = await axios.get(url, { timeout: 15000, headers: { 'User-Agent': UA }, maxRedirects: 5 });
             $ = cheerio.load(r.data);
           } else {
-            const r = await axios.get(url, { timeout: 10000, headers: { 'User-Agent': UA } });
+            const r = await axios.get(url, { timeout: 15000, headers: { 'User-Agent': UA }, maxRedirects: 5 });
             $ = cheerio.load(r.data);
           }
 
