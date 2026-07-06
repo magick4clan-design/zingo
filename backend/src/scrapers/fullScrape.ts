@@ -4,7 +4,7 @@ import { BaseScraper } from './baseScraper';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const OUTPUT_FILE = path.join(__dirname, 'scraped_data.json');
+const OUTPUT_FILE = path.join(process.cwd(), 'scraped_data.json');
 
 async function sleep(ms: number) {
   return new Promise(r => setTimeout(r, ms));

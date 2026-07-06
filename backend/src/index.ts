@@ -109,9 +109,7 @@ app.get('/scraper/full', async (_req, res) => {
 
 app.get('/scraper/full/status', async (_req, res) => {
   const fs = require('fs');
-  const dataPath = path.join(__dirname, '../src/scrapers/scraped_data.json');
-  const distPath = path.join(__dirname, 'scrapers/scraped_data.json');
-  const filePath = fs.existsSync(dataPath) ? dataPath : distPath;
+  const filePath = path.join(process.cwd(), 'scraped_data.json');
   
   if (!fs.existsSync(filePath)) {
     return res.json({ running: scraperRunning, exists: false });
