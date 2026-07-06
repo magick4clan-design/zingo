@@ -1,0 +1,15 @@
+node_modules
+dist
+.next
+frontend/node_modules
+frontend/.next
+android/.gradle
+android/app/build
+backend/node_modules
+backend/dist
+scraper/__pycache__
+*.db
+*.db-journal
+*.log
+.env
+.env.local
