@@ -31,21 +31,30 @@ export class AnimexScraper extends BaseScraper {
 
   async getListings(page: number = 1): Promise<string[]> {
     const urls: string[] = [];
-    const $ = await this.fetchPage(`${this.baseUrl}/page/${page}/`);
-    if (!$) return urls;
+    
+    // animex.click uses /movie/, /serial/, /anime/ for listings
+    // and /movie/page/2/, /serial/page/3/ for pagination
+    const pages = [
+      page === 1 ? `${this.baseUrl}/movie/` : `${this.baseUrl}/movie/page/${page}/`,
+      page === 1 ? `${this.baseUrl}/serial/` : `${this.baseUrl}/serial/page/${page}/`,
+      page === 1 ? `${this.baseUrl}/anime/` : `${this.baseUrl}/anime/page/${page}/`,
+    ];
 
-    // Find all content links (anime, movie, serial)
-    $('a[href]').each((_, el) => {
-      const href = this.getAttr($(el), 'href');
-      if (!href) return;
+    for (const pageUrl of pages) {
+      const $ = await this.fetchPage(pageUrl);
+      if (!$) continue;
 
-      // Match anime/movie/serial links from both domains
-      if (href.match(/animex\.(click|cc)\/(anime|movie|serial)\//)) {
-        // Normalize to animex.click domain
-        const normalizedUrl = href.replace('animex.cc', 'animex.click');
-        urls.push(normalizedUrl);
-      }
-    });
+      $('a[href]').each((_, el) => {
+        const href = this.getAttr($(el), 'href');
+        if (!href) return;
+
+        // Match anime/movie/serial links
+        if (href.match(/animex\.(click|cc)\/(anime|movie|serial)\//)) {
+          const normalizedUrl = href.replace('animex.cc', 'animex.click');
+          urls.push(normalizedUrl);
+        }
+      });
+    }
 
     return [...new Set(urls)];
   }
