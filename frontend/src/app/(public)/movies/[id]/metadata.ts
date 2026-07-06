@@ -1,14 +1,6 @@
 import type { Metadata } from 'next';
 
-export function generateStaticParams() {
-  return [{ id: '1' }];
-}
-
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}): Promise<Metadata> {
+export async function generateMetadata(): Promise<Metadata> {
   return {
     title: `فیلم - زینگو`,
     description: `دانلود فیلم با لینک مستقیم و زیرنویس فارسی از زینگو`,

@@ -2,10 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-
-export function generateStaticParams() {
-  return [{ id: '1' }];
-}
 import Image from 'next/image';
 import Link from 'next/link';
 import { FiStar, FiHeart, FiShare2, FiDownload, FiCalendar, FiChevronDown, FiChevronUp, FiList, FiMonitor, FiServer, FiCamera } from 'react-icons/fi';
