@@ -90,6 +90,39 @@ app.get('/', (_req, res) => {
   });
 });
 
+// ==================== Scraper Test ====================
+app.get('/scraper/test', async (_req, res) => {
+  const axios = (await import('axios')).default;
+  const tests: Array<{ name: string; url: string; status: string; code?: number }> = [];
+
+  for (const site of [
+    { name: 'animex.click', url: 'https://animex.click/page/1/' },
+    { name: 'donyayeserial.com', url: 'https://donyayeserial.com/page/1/' },
+  ]) {
+    try {
+      const r = await axios.get(site.url, {
+        timeout: 10000,
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+        maxRedirects: 5,
+      });
+      tests.push({ name: site.name, url: site.url, status: 'OK', code: r.status });
+    } catch (err: any) {
+      tests.push({ name: site.name, url: site.url, status: err.message?.substring(0, 80) || 'error', code: err.response?.status });
+    }
+  }
+
+  const movieCount = await prisma.movie.count();
+  const seriesCount = await prisma.series.count();
+  const lastLog = await prisma.scrapLog.findFirst({ orderBy: { startedAt: 'desc' } });
+
+  res.json({
+    sites: tests,
+    db: { movies: movieCount, series: seriesCount },
+    lastScrape: lastLog,
+    scraperRunning,
+  });
+});
+
 // ==================== Scraper Admin Panel ====================
 let scraperRunning = false;
 

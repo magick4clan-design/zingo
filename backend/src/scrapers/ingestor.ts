@@ -165,10 +165,18 @@ export async function runScraper(): Promise<{ created: number; updated: number; 
   for (const { scraper, name } of scrapers) {
     console.log(`\n========== ${name.toUpperCase()} ==========`);
     try {
-      console.log(`  Fetching page listings...`);
-      const urls = await getAllUrls(scraper);
+      console.log(`  Fetching page 1...`);
+      const page1Urls = await scraper.getListings(1);
+      console.log(`  Page 1: ${page1Urls.length} URLs found`);
+
+      if (page1Urls.length === 0) {
+        console.log(`  ⚠ No URLs found on page 1. Site may be unreachable.`);
+        continue;
+      }
+
+      const urls = [...new Set(page1Urls)];
       totalUrls += urls.length;
-      console.log(`  Found ${urls.length} unique URLs\n`);
+      console.log(`  Total: ${urls.length} unique URLs\n`);
 
       let processed = 0;
       for (const url of urls) {
@@ -189,8 +197,8 @@ export async function runScraper(): Promise<{ created: number; updated: number; 
           await sleep(DELAY_BETWEEN_ITEMS_MS);
         } catch (err: any) {
           totalFailed++;
-          if (processed % 50 === 0) {
-            console.error(`  [${processed}/${urls.length}] ✗ ${err.message?.substring(0, 60)}`);
+          if (processed <= 5 || processed % 20 === 0) {
+            console.error(`  [${processed}/${urls.length}] ✗ ${err.message?.substring(0, 80)}`);
           }
         }
       }
