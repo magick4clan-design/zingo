@@ -1,5 +1,4 @@
 import path from 'path';
-import fs from 'fs';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -20,7 +19,6 @@ import { errorHandler } from './middleware/errorHandler';
 import './scheduler';
 
 const app = express();
-const frontendPath = path.join(__dirname, '../../frontend/out');
 
 // ==================== Middleware ====================
 app.use(helmet({
@@ -73,19 +71,20 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
-// ==================== Frontend Static Files ====================
-app.use(express.static(frontendPath, {
-  index: 'index.html',
-}));
-
-// ==================== SPA Fallback ====================
-app.get('*', (req, res) => {
-  const indexPath = path.join(frontendPath, 'index.html');
-  if (fs.existsSync(indexPath)) {
-    res.sendFile(indexPath);
-  } else {
-    res.status(404).send('Frontend not built. Run: cd frontend && npm run build');
-  }
+// ==================== Root ====================
+app.get('/', (_req, res) => {
+  res.json({
+    name: 'Zingo API',
+    version: '1.0.0',
+    status: 'running',
+    endpoints: {
+      health: '/api/health',
+      movies: '/api/movies',
+      series: '/api/series',
+      genres: '/api/genres',
+      auth: '/api/auth',
+    },
+  });
 });
 
 // ==================== Error Handler ====================
@@ -95,7 +94,7 @@ app.use(errorHandler);
 app.listen(config.port, () => {
   console.log(`
   ╔══════════════════════════════════════╗
-  ║   🎬 Zingo Server Running          ║
+  ║   🎬 Zingo API Server Running      ║
   ║   🌐 http://localhost:${config.port}        ║
   ║   📊 Environment: ${config.nodeEnv.padEnd(17)}║
   ╚══════════════════════════════════════╝
