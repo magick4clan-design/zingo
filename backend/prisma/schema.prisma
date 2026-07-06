@@ -1,0 +1,237 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== Enums ====================
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum AdType {
+  BANNER
+  POPUP
+  INTERSTITIAL
+  SPONSOR
+}
+
+// ==================== Models ====================
+
+model User {
+  id           Int       @id @default(autoincrement())
+  email        String    @unique
+  passwordHash String
+  name         String?
+  avatar       String?
+  role         Role      @default(USER)
+  isVerified   Boolean   @default(false)
+  verificationCodes VerificationCode[]
+  favorites    Favorite[]
+  comments     Comment[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("users")
+}
+
+model VerificationCode {
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash   String
+  purpose    String    @default("EMAIL_VERIFICATION")
+  attempts   Int       @default(0)
+  sentAt     DateTime  @default(now())
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, purpose, consumedAt, expiresAt])
+  @@map("verification_codes")
+}
+
+model Genre {
+  id     Int      @id @default(autoincrement())
+  name   String   @unique
+  slug   String   @unique
+  movies MovieGenre[]
+  series SeriesGenre[]
+
+  @@map("genres")
+}
+
+model Movie {
+  id            Int          @id @default(autoincrement())
+  title         String
+  slug          String       @unique
+  originalTitle String?
+  posterUrl     String
+  backdropUrl   String?
+  description   String       @default("")
+  releaseYear   Int?
+  duration      Int?
+  imdbRating    Float?
+  imdbId        String?
+  quality       String?
+  country       String?
+  language      String?
+  director      String?
+  cast          String   @default("[]")
+  screenshots   String   @default("[]")
+  trailerUrl    String?
+  downloadLinks String       @default("{}")
+  source        String
+  sourceUrl     String?
+  status        ContentStatus @default(PUBLISHED)
+  views         Int          @default(0)
+  genres        MovieGenre[]
+  favorites     Favorite[]
+  comments      Comment[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@map("movies")
+}
+
+model MovieGenre {
+  movieId Int
+  genreId Int
+  movie   Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  genre   Genre @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  @@id([movieId, genreId])
+  @@map("movie_genres")
+}
+
+model Series {
+  id            Int          @id @default(autoincrement())
+  title         String
+  slug          String       @unique
+  originalTitle String?
+  posterUrl     String
+  backdropUrl   String?
+  description   String       @default("")
+  releaseYear   Int?
+  imdbRating    Float?
+  imdbId        String?
+  country       String?
+  language      String?
+  network       String?
+  cast          String   @default("[]")
+  screenshots   String   @default("[]")
+  trailerUrl    String?
+  source        String
+  sourceUrl     String?
+  status        ContentStatus @default(PUBLISHED)
+  views         Int          @default(0)
+  genres        SeriesGenre[]
+  seasons       Season[]
+  favorites     Favorite[]
+  comments      Comment[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@map("series")
+}
+
+model SeriesGenre {
+  seriesId Int
+  genreId  Int
+  series   Series @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  genre    Genre  @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  @@id([seriesId, genreId])
+  @@map("series_genres")
+}
+
+model Season {
+  id           Int     @id @default(autoincrement())
+  seriesId     Int
+  series       Series  @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  seasonNumber Int
+  title        String?
+  episodes     Episode[]
+
+  @@map("seasons")
+}
+
+model Episode {
+  id            Int     @id @default(autoincrement())
+  seasonId      Int
+  season        Season  @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  episodeNumber Int
+  title         String?
+  downloadLinks String  @default("{}")
+
+  @@map("episodes")
+}
+
+model Favorite {
+  id       Int    @id @default(autoincrement())
+  userId   Int
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movieId  Int?
+  movie    Movie? @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  seriesId Int?
+  series   Series? @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@map("favorites")
+}
+
+model Comment {
+  id       Int    @id @default(autoincrement())
+  userId   Int
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movieId  Int?
+  movie    Movie? @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  seriesId Int?
+  series   Series? @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  text     String  @default("")
+  createdAt DateTime @default(now())
+
+  @@map("comments")
+}
+
+model Ad {
+  id          Int       @id @default(autoincrement())
+  title       String
+  type        AdType
+  imageUrl    String
+  linkUrl     String
+  position    String?
+  priority    Int       @default(0)
+  isActive    Boolean   @default(true)
+  impressions Int       @default(0)
+  clicks      Int       @default(0)
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("ads")
+}
+
+model ScrapLog {
+  id        Int      @id @default(autoincrement())
+  source    String
+  status    String
+  message   String?
+  itemsScraped Int   @default(0)
+  startedAt DateTime
+  finishedAt DateTime?
+
+  @@map("scrap_logs")
+}
