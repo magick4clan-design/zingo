@@ -12,7 +12,7 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/:path*`,
+        destination: 'https://zingo-production-9a5a.up.railway.app/api/:path*',
       },
     ];
   },
