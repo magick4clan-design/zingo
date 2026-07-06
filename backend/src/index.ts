@@ -90,19 +90,36 @@ app.get('/', (_req, res) => {
   });
 });
 
-// ==================== Import from JSON ====================
-app.get('/scraper/import', async (_req, res) => {
+// ==================== Full Scrape + Save JSON ====================
+app.get('/scraper/full', async (_req, res) => {
   if (scraperRunning) {
     return res.json({ success: false, message: 'اسکرپر در حال اجراست' });
   }
   scraperRunning = true;
   try {
     const { execSync } = await import('child_process');
-    execSync('node dist/scrapers/importJson.js', { timeout: 300000 });
-    const movieCount = await prisma.movie.count();
-    const seriesCount = await prisma.series.count();
+    execSync('node dist/scrapers/fullScrape.js', { timeout: 600000, stdio: 'inherit' });
     scraperRunning = false;
-    res.json({ success: true, message: 'Import completed', movies: movieCount, series: seriesCount });
+    
+    // Read the JSON file
+    const fs = require('fs');
+    const dataPath = path.join(__dirname, '../src/scrapers/scraped_data.json');
+    const distPath = path.join(__dirname, 'scrapers/scraped_data.json');
+    const filePath = fs.existsSync(dataPath) ? dataPath : distPath;
+    
+    if (fs.existsSync(filePath)) {
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+      const stats = {
+        total: data.length,
+        movies: data.filter((d: any) => d.type === 'movie').length,
+        series: data.filter((d: any) => d.type === 'series').length,
+        animex: data.filter((d: any) => d.source === 'animex').length,
+        donyayeserial: data.filter((d: any) => d.source === 'donyayeserial').length,
+      };
+      res.json({ success: true, stats, file: 'scraped_data.json' });
+    } else {
+      res.json({ success: false, message: 'JSON file not found' });
+    }
   } catch (error: any) {
     scraperRunning = false;
     res.status(500).json({ success: false, message: error.message?.substring(0, 200) });
