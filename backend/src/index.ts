@@ -102,7 +102,7 @@ app.get('/scrape/start', async (_req, res) => {
   (async () => {
     try {
       const axios = (await import('axios')).default;
-      const cheerio = (await import('cheerio')).default;
+      const cheerio = require('cheerio');
       const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
       const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
@@ -286,13 +286,13 @@ app.get('/scrape/status', (_req, res) => {
 // Quick test endpoint
 app.get('/scrape/test', async (_req, res) => {
   const axios = (await import('axios')).default;
+  const cheerio = require('cheerio');
   try {
     const r = await axios.get('https://animex.click/movie/', { 
       timeout: 15000, 
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
       maxRedirects: 5
     });
-    const cheerio = (await import('cheerio')).default;
     const $ = cheerio.load(r.data);
     const links: string[] = [];
     $('a[href]').each(function(this: any, _: any, el: any) {
