@@ -89,8 +89,46 @@ async function upsertContent(content: FullContent, sourceUrl: string): Promise<'
   const dlJson = JSON.stringify(content.downloadLinks);
   const scJson = JSON.stringify(content.screenshots || []);
 
-  const existing = await prisma.movie.findUnique({ where: { slug } });
+  if (content.type === 'series') {
+    // Series
+    const existing = await prisma.series.findUnique({ where: { slug } });
+    if (existing) {
+      await prisma.series.update({
+        where: { slug },
+        data: {
+          title: content.title,
+          originalTitle: content.originalTitle || existing.originalTitle,
+          posterUrl: content.posterUrl || existing.posterUrl,
+          description: content.description?.substring(0, 2000) || existing.description,
+          releaseYear: content.releaseYear || existing.releaseYear,
+          imdbRating: content.imdbRating || existing.imdbRating,
+          country: content.country || existing.country,
+          source: content.source,
+        }
+      });
+      return 'updated';
+    }
+    await prisma.series.create({
+      data: {
+        title: content.title,
+        slug,
+        originalTitle: content.originalTitle,
+        posterUrl: content.posterUrl || 'https://via.placeholder.com/300x450',
+        description: content.description?.substring(0, 2000) || '',
+        releaseYear: content.releaseYear,
+        imdbRating: content.imdbRating,
+        country: content.country,
+        source: content.source,
+        sourceUrl,
+        cast: '[]',
+        screenshots: scJson,
+      }
+    });
+    return 'created';
+  }
 
+  // Movie
+  const existing = await prisma.movie.findUnique({ where: { slug } });
   if (existing) {
     await prisma.movie.update({
       where: { slug },
@@ -111,7 +149,7 @@ async function upsertContent(content: FullContent, sourceUrl: string): Promise<'
     return 'updated';
   }
 
-  const movie = await prisma.movie.create({
+  await prisma.movie.create({
     data: {
       title: content.title,
       slug,
@@ -129,18 +167,6 @@ async function upsertContent(content: FullContent, sourceUrl: string): Promise<'
       cast: '[]',
     }
   });
-
-  const seenGenreIds = new Set<number>();
-  for (const g of genreRecords) {
-    if (!seenGenreIds.has(g.id)) {
-      seenGenreIds.add(g.id);
-      try {
-        await prisma.movieGenre.create({
-          data: { movieId: movie.id, genreId: g.id }
-        });
-      } catch {}
-    }
-  }
   return 'created';
 }
 
