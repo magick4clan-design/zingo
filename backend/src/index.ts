@@ -1,3 +1,4 @@
+import path from 'path';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -18,9 +19,13 @@ import { errorHandler } from './middleware/errorHandler';
 import './scheduler';
 
 const app = express();
+const frontendPath = path.join(__dirname, '../../frontend');
 
 // ==================== Middleware ====================
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+}));
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) {
@@ -45,7 +50,7 @@ app.use(express.urlencoded({ extended: true }));
 // ==================== Static Files ====================
 app.use('/uploads', express.static('uploads'));
 
-// ==================== Routes ====================
+// ==================== API Routes ====================
 app.use('/api/auth', authRoutes);
 app.use('/api/movies', movieRoutes);
 app.use('/api/series', seriesRoutes);
@@ -67,6 +72,14 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
+// ==================== Frontend Static Files ====================
+app.use(express.static(frontendPath));
+
+// ==================== SPA Fallback ====================
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(frontendPath, 'index.html'));
+});
+
 // ==================== Error Handler ====================
 app.use(errorHandler);
 
@@ -74,7 +87,7 @@ app.use(errorHandler);
 app.listen(config.port, () => {
   console.log(`
   ╔══════════════════════════════════════╗
-  ║   🎬 Zingo API Server Running      ║
+  ║   🎬 Zingo Server Running          ║
   ║   🌐 http://localhost:${config.port}        ║
   ║   📊 Environment: ${config.nodeEnv.padEnd(17)}║
   ╚══════════════════════════════════════╝
