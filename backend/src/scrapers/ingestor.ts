@@ -5,8 +5,8 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-const DELAY_BETWEEN_PAGES_MS = 2000;
-const DELAY_BETWEEN_ITEMS_MS = 1000;
+const DELAY_BETWEEN_PAGES_MS = 1500;
+const DELAY_BETWEEN_ITEMS_MS = 800;
 
 interface FullContent {
   title: string;

@@ -556,4 +556,20 @@ router.post('/import', async (req, res) => {
   }
 });
 
+// ==================== POST /api/scraper/run ====================
+router.post('/run', async (req, res) => {
+  const apiKey = asString(req.body?.apiKey);
+  if (!apiKey || apiKey !== config.scraper.apiKey) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+
+  try {
+    const { runScraper } = await import('../scrapers/ingestor');
+    runScraper().catch(console.error);
+    res.json({ success: true, message: 'Scraper started in background' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to start scraper' });
+  }
+});
+
 export { router as scraperRoutes };
