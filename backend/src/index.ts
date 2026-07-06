@@ -112,19 +112,32 @@ app.get('/scraper/import', async (_req, res) => {
 // ==================== Scraper Test ====================
 app.get('/scraper/test', async (_req, res) => {
   const axios = (await import('axios')).default;
-  const tests: Array<{ name: string; url: string; status: string; code?: number }> = [];
+  const tests: Array<{ name: string; url: string; status: string; code?: number; linksFound?: number }> = [];
 
   for (const site of [
-    { name: 'animex.click', url: 'https://animex.click/page/1/' },
-    { name: 'donyayeserial.com', url: 'https://donyayeserial.com/page/1/' },
+    { name: 'animex /movie/', url: 'https://animex.click/movie/' },
+    { name: 'animex /serial/', url: 'https://animex.click/serial/' },
+    { name: 'animex /anime/', url: 'https://animex.click/anime/' },
+    { name: 'donyayeserial', url: 'https://donyayeserial.com/page/1/' },
   ]) {
     try {
       const r = await axios.get(site.url, {
-        timeout: 10000,
+        timeout: 15000,
         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
         maxRedirects: 5,
       });
-      tests.push({ name: site.name, url: site.url, status: 'OK', code: r.status });
+      // Count content links
+      const cheerio = await import('cheerio');
+      const $ = cheerio.load(r.data);
+      let linksFound = 0;
+      $('a[href]').each((_, el) => {
+        const href = $(el).attr('href') || '';
+        if (href.match(/animex\.(click|cc)\/(anime|movie|serial)\//) ||
+            href.match(/donyayeserial\.com\/(series|movie|film)\//)) {
+          linksFound++;
+        }
+      });
+      tests.push({ name: site.name, url: site.url, status: 'OK', code: r.status, linksFound });
     } catch (err: any) {
       tests.push({ name: site.name, url: site.url, status: err.message?.substring(0, 80) || 'error', code: err.response?.status });
     }
