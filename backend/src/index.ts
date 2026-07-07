@@ -185,85 +185,29 @@ app.get('/scrape/start', async (_req, res) => {
       scrapeProgress.total = uniqueUrls.length;
       scrapeProgress.phase = 'اسکرپ محتوا';
 
+      // Import proper scrapers
+      const { AnimexScraper } = await import('./scrapers/animexScraper');
+      const { DonyayeSerialScraper } = await import('./scrapers/donyayeSerialScraper');
+      const { upsertContent } = await import('./scrapers/ingestor');
+
+      const animexBackend = new AnimexScraper();
+      const donyayeBackend = new DonyayeSerialScraper();
+
       const scrapeOne = async (url: string): Promise<void> => {
         const shortName = url.split('/').filter(Boolean).pop() || url.substring(0, 40);
         try {
-          const r = await axios.get(url, { timeout: 10000, headers: { 'User-Agent': UA }, maxRedirects: 5 });
-          const $ = cheerio.load(r.data);
+          const isAnimex = url.includes('animex');
+          const scraper = isAnimex ? animexBackend : donyayeBackend;
 
-          let title = '';
-          for (const sel of ['h1.entry-title', 'h1.title', 'h1']) {
-            title = $(sel).text().trim();
-            if (title) break;
-          }
-          if (!title) { const m = $('title').text(); title = m.replace(/–.*$/i, '').trim(); }
-          title = title.replace(/^دانلود\s+(سریال|فیلم|انیمه)\s+/i, '').trim();
-          if (!title) { scrapeProgress.errors++; scrapeProgress.done++; return; }
-
-          const type = (url.includes('/series/') || url.includes('/serial/')) ? 'series' : 'movie';
-          const poster = $('meta[property="og:image"]').attr('content') || $('img').first().attr('src') || '';
-          const description = ($('meta[name="description"]').attr('content') || '').substring(0, 2000);
-          const yearMatch = $('body').html()?.match(/\(?(\d{4})\)?/);
-          const year = yearMatch ? parseInt(yearMatch[1]) : null;
-          const imdbMatch = $('body').text().match(/IMDB[:\s]*(\d+\.?\d*)/i);
-          const imdb = imdbMatch ? parseFloat(imdbMatch[1]) : null;
-
-          const genres: string[] = [];
-          $('a[href*="/genre/"], a[href*="/tag/"]').each(function(this: any, _: any, el: any) {
-            const g = $(el).text().trim();
-            if (g && g.length > 1 && g.length < 30) genres.push(g);
-          });
-
-          const dlLinks: Record<string, string> = {};
-          if (url.includes('animex')) {
-            const dlHosts = ['csdl1', 'ndl1', 'ndl2', 'ndl3', 'ndl4', 'ndl5', 'ndl6', 'ndl7', 'dl.hollowofthealley', 'dl2.hollowofthealley'];
-            $(dlHosts.map((h: string) => `a[href*="${h}"]`).join(', ')).each(function(this: any, _: any, el: any) {
-              const href = $(el).attr('href');
-              if (!href || href.includes('subsource') || href.includes('animexstream')) return;
-              const q = extractQ(href);
-              if (!dlLinks[q]) dlLinks[q] = href;
-            });
-          } else {
-            $('a[href]').each(function(this: any, _: any, el: any) {
-              const href = $(el).attr('href');
-              if (href && (href.includes('iran-gamecenter') || href.includes('.mkv') || href.includes('.mp4') || href.includes('download'))) {
-                if (!href.includes('donyayeserial.com')) {
-                  const q = extractQ(href);
-                  if (!dlLinks[q]) dlLinks[q] = href;
-                }
-              }
-            });
+          const content = await scraper.scrapeContent(url);
+          if (!content || !content.title) {
+            scrapeProgress.errors++;
+            scrapeProgress.done++;
+            return;
           }
 
-          const slug = slugify(title);
-          const dlJson = JSON.stringify(dlLinks);
+          await upsertContent(content as any, url);
 
-          if (type === 'series') {
-            const existing = await prisma.series.findUnique({ where: { slug } });
-            if (!existing) {
-              await prisma.series.create({
-                data: {
-                  title, slug, posterUrl: poster || 'https://via.placeholder.com/300x450',
-                  description, releaseYear: year, imdbRating: imdb,
-                  source: url.includes('animex') ? 'animex' : 'donyayeserial',
-                  sourceUrl: url, cast: '[]', screenshots: '[]',
-                }
-              });
-            }
-          } else {
-            const existing = await prisma.movie.findUnique({ where: { slug } });
-            if (!existing) {
-              await prisma.movie.create({
-                data: {
-                  title, slug, posterUrl: poster || 'https://via.placeholder.com/300x450',
-                  description, releaseYear: year, imdbRating: imdb,
-                  downloadLinks: dlJson, country: 'کشور',
-                  source: url.includes('animex') ? 'animex' : 'donyayeserial',
-                  sourceUrl: url, cast: '[]', screenshots: '[]',
-                }
-              });
-            }
-          }
           scrapeProgress.done++;
           scrapeProgress.current = shortName;
         } catch {
@@ -273,8 +217,8 @@ app.get('/scrape/start', async (_req, res) => {
         }
       };
 
-      // === Phase 2: Parallel scrape in batches ===
-      const BATCH = 12;
+      // Phase 2: Parallel scrape in batches
+      const BATCH = 8;
       for (let i = 0; i < uniqueUrls.length; i += BATCH) {
         const batch = uniqueUrls.slice(i, i + BATCH);
         await Promise.all(batch.map(scrapeOne));

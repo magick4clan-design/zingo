@@ -82,7 +82,7 @@ async function getAllUrls(scraper: AnimexScraper | DonyayeSerialScraper): Promis
   return [...new Set(allUrls)];
 }
 
-async function upsertContent(content: FullContent, sourceUrl: string): Promise<'created' | 'updated' | 'skipped'> {
+export async function upsertContent(content: FullContent, sourceUrl: string): Promise<'created' | 'updated' | 'skipped'> {
   const slug = slugify(content.title);
   const uniqueGenres = [...new Set(content.genreNames.map(g => g.trim()).filter(Boolean))];
   const genreRecords = await Promise.all(uniqueGenres.map(getOrCreateGenre));
