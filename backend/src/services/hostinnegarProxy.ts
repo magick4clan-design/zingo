@@ -90,15 +90,20 @@ async function fetchPage(endpoint: string, page: number): Promise<any[]> {
   }
 }
 
-// Fetch multiple pages like CinemaPlus does (up to 10 pages)
-async function fetchMultiplePages(endpoint: string, limit: number = 30): Promise<any[]> {
+// Fetch multiple pages (up to 50 pages = 1500 items)
+async function fetchAllPages(endpoint: string): Promise<any[]> {
   const allItems: any[] = [];
   let currentPage = 0;
+  let emptyCount = 0;
   
-  while (allItems.length < limit && currentPage < 10) {
+  while (emptyCount < 3 && currentPage < 50) {
     const items = await fetchPage(endpoint, currentPage);
-    if (items.length === 0) break;
-    allItems.push(...items);
+    if (items.length === 0) {
+      emptyCount++;
+    } else {
+      emptyCount = 0;
+      allItems.push(...items);
+    }
     currentPage++;
   }
   
@@ -107,12 +112,11 @@ async function fetchMultiplePages(endpoint: string, limit: number = 30): Promise
 
 export async function getNewMovies(page: number = 1, limit: number = 30) {
   if (page > 1) {
-    // For pagination beyond first page, fetch that specific page
     const items = await fetchPage('/api/movie/by/filtres/0/created/', page - 1);
     return items.map(transformMovie);
   }
-  // For first page, fetch multiple pages to get enough items
-  const items = await fetchMultiplePages('/api/movie/by/filtres/0/created/', limit);
+  // For first page, fetch ALL pages
+  const items = await fetchAllPages('/api/movie/by/filtres/0/created/');
   return items.map(transformMovie);
 }
 
@@ -121,7 +125,7 @@ export async function getTopRatedMovies(page: number = 1, limit: number = 30) {
     const items = await fetchPage('/api/movie/by/filtres/0/imdb/', page - 1);
     return items.map(transformMovie);
   }
-  const items = await fetchMultiplePages('/api/movie/by/filtres/0/imdb/', limit);
+  const items = await fetchAllPages('/api/movie/by/filtres/0/imdb/');
   return items.map(transformMovie);
 }
 
@@ -130,7 +134,7 @@ export async function getNewSeries(page: number = 1, limit: number = 30) {
     const items = await fetchPage('/api/serie/by/filtres/0/created/', page - 1);
     return items.map(transformSeries);
   }
-  const items = await fetchMultiplePages('/api/serie/by/filtres/0/created/', limit);
+  const items = await fetchAllPages('/api/serie/by/filtres/0/created/');
   return items.map(transformSeries);
 }
 
@@ -139,7 +143,7 @@ export async function getTopRatedSeries(page: number = 1, limit: number = 30) {
     const items = await fetchPage('/api/serie/by/filtres/0/imdb/', page - 1);
     return items.map(transformSeries);
   }
-  const items = await fetchMultiplePages('/api/serie/by/filtres/0/imdb/', limit);
+  const items = await fetchAllPages('/api/serie/by/filtres/0/imdb/');
   return items.map(transformSeries);
 }
 
@@ -148,7 +152,7 @@ export async function getUpdatedSeries(page: number = 1, limit: number = 30) {
     const items = await fetchPage('/api/serie/by/filtres/0/updated/', page - 1);
     return items.map(transformSeries);
   }
-  const items = await fetchMultiplePages('/api/serie/by/filtres/0/updated/', limit);
+  const items = await fetchAllPages('/api/serie/by/filtres/0/updated/');
   return items.map(transformSeries);
 }
 
@@ -157,13 +161,12 @@ export async function getBestSeries(page: number = 1, limit: number = 30) {
     const items = await fetchPage('/api/serie/by/filtres/0/imdb/', page - 1);
     return items.map(transformSeries);
   }
-  const items = await fetchMultiplePages('/api/serie/by/filtres/0/imdb/', limit);
+  const items = await fetchAllPages('/api/serie/by/filtres/0/imdb/');
   return items.map(transformSeries);
 }
 
 export async function getMovieById(id: number) {
   try {
-    // Try direct API endpoint first
     const { data } = await axios.get(`${API_BASE}/api/movie/${id}/${API_KEY}/`, {
       timeout: 20000,
       headers: { Accept: 'application/json' },
@@ -171,7 +174,6 @@ export async function getMovieById(id: number) {
     if (data && data.id) return transformMovie(data);
   } catch {}
   
-  // If direct endpoint doesn't work, search in cached movies
   const movies = await getNewMovies(1, 100);
   return movies.find(m => m.id === id) || null;
 }
