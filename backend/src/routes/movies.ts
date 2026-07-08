@@ -1,32 +1,40 @@
 import { Router } from 'express';
-import * as proxy from '../services/hostinnegarProxy';
+import { prisma } from '../services/prisma';
+import { parseJsonFields, parseJsonFieldsArray } from '../services/helpers';
 
 const router = Router();
 
 router.get('/', async (req, res) => {
   try {
-    const { page = '1', limit = '30', genre, search, sort = 'createdAt', order = 'desc', year, rating } = req.query;
-    const p = parseInt(page as string);
-    const l = parseInt(limit as string);
+    const { page = '1', limit = '20', genre, search, sort = 'createdAt', order = 'desc', year, rating } = req.query;
+    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+    const take = parseInt(limit as string);
 
-    let movies;
-    if (search) {
-      movies = await proxy.searchContent(search as string);
-    } else if (sort === 'rating' || sort === 'imdb') {
-      movies = await proxy.getTopRatedMovies(p, l);
-    } else {
-      movies = await proxy.getNewMovies(p, l);
-    }
+    const where: Record<string, unknown> = { status: 'PUBLISHED' };
+    if (genre) where.genres = { some: { genre: { slug: genre as string } } };
+    if (search) where.OR = [{ title: { contains: search as string } }, { originalTitle: { contains: search as string } }];
+    if (year) where.releaseYear = parseInt(year as string);
+    if (rating) where.imdbRating = { gte: parseFloat(rating as string) };
 
-    if (year) movies = movies.filter((m: any) => m.releaseYear === parseInt(year as string));
-    if (rating) movies = movies.filter((m: any) => m.imdbRating && m.imdbRating >= parseFloat(rating as string));
-    if (genre) movies = movies.filter((m: any) => m.genres?.some((g: any) => g.genre?.slug === genre || g.genre?.name === genre));
+    const orderBy: Record<string, string> = {};
+    if (sort === 'rating') orderBy.imdbRating = order as string;
+    else if (sort === 'views') orderBy.views = order as string;
+    else if (sort === 'year') orderBy.releaseYear = order as string;
+    else orderBy.createdAt = order as string;
+
+    const [movies, total] = await Promise.all([
+      prisma.movie.findMany({
+        where, orderBy, skip, take,
+        include: { genres: { include: { genre: true } }, _count: { select: { favorites: true, comments: true } } },
+      }),
+      prisma.movie.count({ where }),
+    ]);
 
     res.json({
       success: true,
       data: {
-        movies: movies.slice(0, l),
-        pagination: { page: p, limit: l, total: movies.length, totalPages: Math.ceil(movies.length / l) },
+        movies: parseJsonFieldsArray(movies as unknown as Record<string, unknown>[], ['cast', 'screenshots', 'downloadLinks']),
+        pagination: { page: parseInt(page as string), limit: take, total, totalPages: Math.ceil(total / take) },
       },
     });
   } catch (error) {
@@ -36,9 +44,14 @@ router.get('/', async (req, res) => {
 
 router.get('/top-imdb', async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit as string || '30');
-    const movies = await proxy.getTopRatedMovies(1, limit);
-    res.json({ success: true, data: movies.slice(0, limit) });
+    const limit = parseInt(req.query.limit as string || '10');
+    const movies = await prisma.movie.findMany({
+      where: { status: 'PUBLISHED', imdbRating: { not: null } },
+      orderBy: { imdbRating: 'desc' },
+      take: limit,
+      include: { genres: { include: { genre: true } } },
+    });
+    res.json({ success: true, data: parseJsonFieldsArray(movies as unknown as Record<string, unknown>[], ['cast', 'screenshots', 'downloadLinks']) });
   } catch (error) {
     res.status(500).json({ success: false, message: 'خطا در دریافت برترین فیلم‌ها' });
   }
@@ -46,9 +59,30 @@ router.get('/top-imdb', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
-    const movie = await proxy.getMovieById(parseInt(req.params.id));
+    const movie = await prisma.movie.findUnique({
+      where: { id: parseInt(req.params.id) },
+      include: {
+        genres: { include: { genre: true } },
+        comments: { include: { user: { select: { name: true, avatar: true } } }, orderBy: { createdAt: 'desc' }, take: 20 },
+        _count: { select: { favorites: true, comments: true } },
+      },
+    });
+
     if (!movie) return res.status(404).json({ success: false, message: 'فیلم یافت نشد' });
-    res.json({ success: true, data: movie });
+
+    await prisma.movie.update({ where: { id: movie.id }, data: { views: { increment: 1 } } });
+
+    const genreIds = movie.genres.map((g) => g.genreId);
+    const similar = await prisma.movie.findMany({
+      where: { id: { not: movie.id }, status: 'PUBLISHED', genres: { some: { genreId: { in: genreIds } } } },
+      take: 6,
+      include: { genres: { include: { genre: true } } },
+    });
+
+    res.json({
+      success: true,
+      data: { ...parseJsonFields(movie as unknown as Record<string, unknown>, ['cast', 'screenshots', 'downloadLinks']), similar: parseJsonFieldsArray(similar as unknown as Record<string, unknown>[], ['cast', 'screenshots', 'downloadLinks']) },
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: 'خطا در دریافت فیلم' });
   }
