@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { FiFilm, FiTv, FiUsers, FiTrendingUp, FiActivity, FiArrowLeft, FiList } from 'react-icons/fi';
+import { FiFilm, FiTv, FiUsers, FiTrendingUp, FiArrowLeft, FiList } from 'react-icons/fi';
 import { adminAPI } from '@/lib/api';
 import { toPersianNumber } from '@/lib/utils';
 import { LoadingSpinner } from '@/components/common/Loading';
@@ -11,7 +11,6 @@ export default function AdminPage() {
   const [stats, setStats] = useState<Record<string, number>>({});
   const [recentMovies, setRecentMovies] = useState([]);
   const [recentSeries, setRecentSeries] = useState([]);
-  const [scrapLogs, setScrapLogs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -21,7 +20,6 @@ export default function AdminPage() {
         setStats(data.stats);
         setRecentMovies(data.recentMovies);
         setRecentSeries(data.recentSeries);
-        setScrapLogs(data.recentScrapLogs);
       })
       .catch(console.error)
       .finally(() => setIsLoading(false));
@@ -41,7 +39,6 @@ export default function AdminPage() {
     { href: '/admin/series', label: 'مدیریت سریال‌ها', icon: FiTv },
     { href: '/admin/users', label: 'مدیریت کاربران', icon: FiUsers },
     { href: '/admin/genres', label: 'مدیریت ژانرها', icon: FiList },
-    { href: '/admin/scraper', label: 'مدیریت اسکرپ', icon: FiActivity },
   ];
 
   return (
@@ -127,23 +124,6 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* Scrap Logs */}
-      {scrapLogs.length > 0 && (
-        <div className="card p-5 mt-6">
-          <h2 className="font-bold mb-4">لاگ‌های اسکرپ</h2>
-          <div className="space-y-2">
-            {scrapLogs.slice(0, 10).map((log: Record<string, unknown>) => (
-              <div key={String(log.id)} className="flex items-center justify-between p-2 rounded-lg bg-[var(--bg-hover)] text-sm">
-                <div className="flex items-center gap-3">
-                  <span className={`w-2 h-2 rounded-full ${log.status === 'success' ? 'bg-green-500' : 'bg-red-500'}`} />
-                  <span className="font-medium">{log.source as string}</span>
-                </div>
-                <span className="text-[var(--text-muted)]">{toPersianNumber(log.itemsScraped as number)} مورد</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

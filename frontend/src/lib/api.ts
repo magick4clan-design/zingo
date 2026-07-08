@@ -138,7 +138,6 @@ export const adminAPI = {
   getComments: () => api.get('/admin/comments'),
   deleteComment: (id: number) =>
     api.delete(`/admin/comments/${id}`),
-  getScrapLogs: () => api.get('/scraper/logs'),
 };
 
 export default api;

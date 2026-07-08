@@ -6,7 +6,6 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "scraper": "node dist/scrapers/ingestor.js",
     "scheduler": "node dist/scheduler.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",

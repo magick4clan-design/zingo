@@ -1,34 +1,30 @@
 import cron from 'node-cron';
-import { runScraper } from './scrapers/ingestor';
+import { PrismaClient } from '@prisma/client';
+import { syncFromHostinnegar } from './services/hostinnegarSync';
 import { config } from './config';
 
-const CRON_EVERY_12_HOURS = '0 */12 * * *';
+const prisma = new PrismaClient();
+
 const CRON_EVERY_6_HOURS = '0 */6 * * *';
 
-const intervalHours = config.scraper.intervalHours || 12;
-const cronExpression = intervalHours <= 6 ? CRON_EVERY_6_HOURS : CRON_EVERY_12_HOURS;
-
 console.log(`\n⏰ Scheduler initialized`);
-console.log(`   Cron expression: ${cronExpression}`);
-console.log(`   Interval: every ${intervalHours} hours`);
+console.log(`   Cron: ${CRON_EVERY_6_HOURS} (every 6 hours)`);
 
-// Run immediately on startup (with a short delay to let the server start)
 setTimeout(async () => {
-  console.log('\n🔄 Running initial scrape...');
+  console.log('\n🔄 Running initial sync from hostinnegar.com...');
   try {
-    await runScraper();
+    await syncFromHostinnegar(prisma);
   } catch (err: any) {
-    console.error('Initial scrape failed:', err.message);
+    console.error('Initial sync failed:', err.message);
   }
 }, 5000);
 
-// Schedule recurring scrapes
-cron.schedule(cronExpression, async () => {
-  console.log(`\n⏰ Scheduled scrape triggered at ${new Date().toISOString()}`);
+cron.schedule(CRON_EVERY_6_HOURS, async () => {
+  console.log(`\n⏰ Scheduled sync at ${new Date().toISOString()}`);
   try {
-    await runScraper();
+    await syncFromHostinnegar(prisma);
   } catch (err: any) {
-    console.error('Scheduled scrape failed:', err.message);
+    console.error('Scheduled sync failed:', err.message);
   }
 });
 
