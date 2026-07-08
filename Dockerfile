@@ -21,4 +21,5 @@ COPY backend/package*.json ./
 RUN npm prune --omit=dev
 RUN mkdir -p /data /app/uploads
 EXPOSE 5000
+# v2 - hostinnegar sync
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
