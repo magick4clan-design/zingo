@@ -106,7 +106,7 @@ export async function getSeasons(serieId: number) {
 
 export async function searchContent(query: string) {
   try {
-    const { data } = await axios.get(`${API_BASE}/api/search/${encodeURIComponent(query)}/${API_KEY}`, {
+    const { data } = await axios.get(`${API_BASE}/api/search/${encodeURIComponent(query)}/${API_KEY}/`, {
       timeout: 20000, headers: { Accept: 'application/json' },
     });
     const items = Array.isArray(data) ? data : [];
