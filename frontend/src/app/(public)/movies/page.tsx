@@ -25,15 +25,14 @@ function MoviesPageContent() {
       setIsLoading(true);
       try {
         const params: Record<string, string> = {
-          page: String(pagination.page),
-          limit: '24',
+          page: String(pagination.page - 1),
+          limit: '30',
           sort: sortBy,
         };
         if (selectedGenre) params.genre = selectedGenre;
 
         const res = await moviesAPI.getAll(params);
         setMovies(res.data.data.movies);
-        setPagination(res.data.data.pagination);
       } catch (error) {
         console.error('Failed to fetch movies:', error);
       } finally {

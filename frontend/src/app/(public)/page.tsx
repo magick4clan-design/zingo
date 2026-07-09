@@ -34,9 +34,9 @@ export default function HomePage() {
     async function fetchData() {
       try {
         const [moviesRes, topImdbRes, seriesRes] = await Promise.all([
-          moviesAPI.getAll({ limit: '20', sort: 'createdAt', order: 'desc' }),
-          moviesAPI.getTopIMDB(12),
-          seriesAPI.getAll({ limit: '20', sort: 'views', order: 'desc' }),
+          moviesAPI.getAll({ page: '0', limit: '30' }),
+          moviesAPI.getTopIMDB(30),
+          seriesAPI.getAll({ page: '0', limit: '30' }),
         ]);
 
         const movies = moviesRes.data.data.movies || [];

@@ -23,15 +23,14 @@ function SeriesPageContent() {
       setIsLoading(true);
       try {
         const params: Record<string, string> = {
-          page: String(pagination.page),
-          limit: '24',
+          page: String(pagination.page - 1),
+          limit: '30',
           sort: sortBy,
         };
         if (selectedGenre) params.genre = selectedGenre;
 
         const res = await seriesAPI.getAll(params);
         setSeries(res.data.data.series);
-        setPagination(res.data.data.pagination);
       } catch (error) {
         console.error('Failed to fetch series:', error);
       } finally {
