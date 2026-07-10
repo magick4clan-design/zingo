@@ -1,9 +1,9 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://zingo-production-9a5a.up.railway.app';
+const API_BASE_URL = '/api';
 
 const api = axios.create({
-  baseURL: `${API_BASE_URL}/api`,
+  baseURL: API_BASE_URL,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -104,10 +104,8 @@ export const searchAPI = {
     api.get('/movies', { params: { search: query } }),
   series: (query: string) =>
     api.get('/series', { params: { search: query } }),
-  search: (query: string) => {
-    const localApi = axios.create({ baseURL: '/api', timeout: 30000, headers: { 'Content-Type': 'application/json' } });
-    return localApi.get('/search', { params: { q: query } });
-  },
+  search: (query: string) =>
+    api.get('/search', { params: { q: query } }),
 };
 
 // ==================== Admin API ====================

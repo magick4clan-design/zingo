@@ -8,14 +8,6 @@ const nextConfig = {
       },
     ],
   },
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: 'https://zingo-production-9a5a.up.railway.app/api/:path*',
-      },
-    ];
-  },
 };
 
 module.exports = nextConfig;
